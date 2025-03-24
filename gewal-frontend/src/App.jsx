@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 // Common components
 import Home from './pages/Home';
 import NotFound from './pages/NotFound';
+import FinancesPage from './pages/FinanceAssistance'; // Import the finances page
 
 // User components
 import UserLogin from './components/user/auth/UserLogin';
@@ -31,6 +32,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
+          <Route path="/finances" element={<FinancesPage />} /> {/* New FinancesPage route */}
           
           {/* User Auth Routes */}
           <Route path="/login" element={<UserLogin />} />
