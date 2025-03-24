@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { createFinance } from '../services/finance';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, User, FileText, Building, DollarSign, Clipboard, AlertCircle, } from 'lucide-react';
+import backgroundImage from '../assets/fi.jpg';
 
 const banks = [
   { id: 'BOC', name: 'Bank of Ceylon', info: 'Interest rate around 8.5% with low processing fee' },
   { id: 'CommBank', name: 'Commercial Bank', info: 'Interest rate around 9% with fast approval process' },
   { id: 'Sampath', name: 'Sampath Bank', info: 'Interest rate around 8.8% with flexible repayment options' },
 ];
+
+// Fixed additional costs
+const additionalCosts = {
+  propertyTaxes: 25000,
+  homeInsurance: 15000,
+  valuationFees: 10000,
+  legalFees: 30000
+};
 
 const FinancesPage = () => {
   const [step, setStep] = useState(1);
@@ -24,27 +33,107 @@ const FinancesPage = () => {
     paymentFrequency: 'monthly', // monthly or quarterly
     // Step 3: Bank Selection
     bank: '',
-    // Step 4: Additional Costs
-    propertyTaxes: 0,
-    homeInsurance: 0,
-    valuationFees: 0,
-    legalFees: 0,
+    // Step 4: Additional Costs - now using fixed values
+    propertyTaxes: additionalCosts.propertyTaxes,
+    homeInsurance: additionalCosts.homeInsurance,
+    valuationFees: additionalCosts.valuationFees,
+    legalFees: additionalCosts.legalFees,
   });
+  
+  // Add validation errors state
+  const [errors, setErrors] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    propertyPrice: ''
+  });
+  
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const steps = [
-    { id: 1, name: 'Personal Info' },
-    { id: 2, name: 'Loan Details' },
-    { id: 3, name: 'Bank Selection' },
-    { id: 4, name: 'Additional Costs' },
-    { id: 5, name: 'Review & Submit' },
+    { id: 1, name: 'Personal Info', icon: <User className="h-5 w-5" /> },
+    { id: 2, name: 'Loan Details', icon: <FileText className="h-5 w-5" /> },
+    { id: 3, name: 'Bank Selection', icon: <Building className="h-5 w-5" /> },
+    { id: 4, name: 'Additional Costs', icon: <DollarSign className="h-5 w-5" /> },
+    { id: 5, name: 'Review & Submit', icon: <Clipboard className="h-5 w-5" /> },
   ];
+
+  // Validate full name - no numbers, max 30 chars
+  const validateFullName = (value) => {
+    let error = '';
+    if (!value.trim()) {
+      error = 'Full name is required';
+    } else if (value.length > 30) {
+      error = 'Full name cannot exceed 30 characters';
+    } else if (/\d/.test(value)) {
+      error = 'Full name cannot contain numbers';
+    }
+    return error;
+  };
+
+  // Validate email format
+  const validateEmail = (value) => {
+    let error = '';
+    if (!value.trim()) {
+      error = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      error = 'Invalid email format';
+    }
+    return error;
+  };
+
+  // Validate phone - exactly 10 digits
+  const validatePhone = (value) => {
+    let error = '';
+    if (!value.trim()) {
+      error = 'Phone number is required';
+    } else if (!/^\d{10}$/.test(value)) {
+      error = 'Phone number must be exactly 10 digits';
+    }
+    return error;
+  };
+
+  // Validate property price
+  const validatePropertyPrice = (value) => {
+    let error = '';
+    if (!value || value <= 0) {
+      error = 'Property price must be greater than 0';
+    }
+    return error;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    // For full name, prevent numbers
+    if (name === 'fullName' && /\d/.test(value)) {
+      return; // Don't update state if numbers are entered
+    }
+    
+    // For phone, prevent non-digits and limit to 10 digits
+    if (name === 'phone') {
+      const digits = value.replace(/\D/g, '');
+      if (digits.length <= 10) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: digits
+        }));
+      }
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+    
+    // Validate the field that was just changed
+    if (name === 'fullName') {
+      setErrors(prev => ({ ...prev, fullName: validateFullName(value) }));
+    } else if (name === 'email') {
+      setErrors(prev => ({ ...prev, email: validateEmail(value) }));
+    } else if (name === 'phone') {
+      setErrors(prev => ({ ...prev, phone: validatePhone(value) }));
+    }
   };
 
   const handleNumberChange = (e) => {
@@ -53,10 +142,65 @@ const FinancesPage = () => {
       ...prev,
       [name]: Number(value)
     }));
+    
+    if (name === 'propertyPrice') {
+      setErrors(prev => ({ ...prev, propertyPrice: validatePropertyPrice(Number(value)) }));
+    }
   };
 
-  const nextStep = () => setStep(prev => prev + 1);
+  const validateStep1 = () => {
+    const fullNameError = validateFullName(formData.fullName);
+    const emailError = validateEmail(formData.email);
+    const phoneError = validatePhone(formData.phone);
+    const propertyPriceError = validatePropertyPrice(formData.propertyPrice);
+    
+    setErrors({
+      fullName: fullNameError,
+      email: emailError,
+      phone: phoneError,
+      propertyPrice: propertyPriceError
+    });
+    
+    return !fullNameError && !emailError && !phoneError && !propertyPriceError;
+  };
+
+  const nextStep = () => {
+    if (step === 1) {
+      // Validate step 1 before proceeding
+      if (!validateStep1()) {
+        return; // Don't advance if validation fails
+      }
+    }
+    setStep(prev => prev + 1);
+  };
+  
   const prevStep = () => setStep(prev => prev - 1);
+
+  const resetForm = () => {
+    setFormData({
+      fullName: '',
+      email: '',
+      phone: '',
+      propertyPrice: 0,
+      downPaymentPercent: 0,
+      loanTerm: 5,
+      interestRate: 8,
+      loanType: 'fixed',
+      paymentFrequency: 'monthly',
+      bank: '',
+      propertyTaxes: additionalCosts.propertyTaxes,
+      homeInsurance: additionalCosts.homeInsurance,
+      valuationFees: additionalCosts.valuationFees,
+      legalFees: additionalCosts.legalFees,
+    });
+    setErrors({
+      fullName: '',
+      email: '',
+      phone: '',
+      propertyPrice: ''
+    });
+    setStep(1);
+  };
 
   const handleSubmit = async () => {
     // Calculate derived values:
@@ -69,10 +213,16 @@ const FinancesPage = () => {
     const totalAdditionalCosts = Number(formData.propertyTaxes) + Number(formData.homeInsurance) + Number(formData.valuationFees) + Number(formData.legalFees);
     const totalCost = loanAmount + totalInterest + totalAdditionalCosts;
     
+    // Calculate loan to value ratio
+    const ltv = (loanAmount / formData.propertyPrice) * 100;
+    
     // Prepare payload for API. Note that property and user can later be replaced with real ids.
     const payload = {
       property: "", // Replace with property id related to propertyPrice if needed.
       user: "",     // Replace with user id collected from authentication if needed.
+      userName: formData.fullName,
+      userEmail: formData.email,
+      selectedBank: formData.bank,
       loanAmount,
       downPayment: downPaymentAmount,
       interestRate: formData.interestRate,
@@ -82,14 +232,18 @@ const FinancesPage = () => {
       valuationFees: formData.valuationFees,
       legalFees: formData.legalFees,
       loanType: formData.loanType,
-      paymentFrequency: formData.paymentFrequency
+      paymentFrequency: formData.paymentFrequency,
+      monthlyPayment,
+      totalInterest,
+      totalCost,
+      ltv: ltv.toFixed(2)
     };
 
     try {
       const response = await createFinance(payload);
-      // Simulate sending an email to bank with the selected bank info.
-      alert(`Application submitted successfully! An email has been sent to your selected bank (${formData.bank}).`);
-      // Optionally, reset the form here or redirect.
+      // Show success modal instead of alert
+      setShowSuccessModal(true);
+      // Optionally, reset the form here or redirect after a delay
     } catch (error) {
       alert("There was an error submitting the form.");
     }
@@ -100,7 +254,10 @@ const FinancesPage = () => {
       case 1:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Personal Information</h2>
+            <h2 className="text-2xl font-semibold text-blue-800 flex items-center">
+              <User className="mr-2 h-6 w-6 text-blue-600" />
+              Personal Information
+            </h2>
             
             <div className="space-y-4">
               <div>
@@ -112,8 +269,12 @@ const FinancesPage = () => {
                   name="fullName" 
                   value={formData.fullName} 
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                  maxLength={30}
+                  className={`w-full px-4 py-2 border ${errors.fullName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`} 
                 />
+                {errors.fullName && (
+                  <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>
+                )}
               </div>
               
               <div>
@@ -125,8 +286,11 @@ const FinancesPage = () => {
                   name="email" 
                   value={formData.email} 
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                  className={`w-full px-4 py-2 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
                 />
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                )}
               </div>
               
               <div>
@@ -134,12 +298,15 @@ const FinancesPage = () => {
                   Phone Number
                 </label>
                 <input 
-                  type="text" 
+                  type="tel" 
                   name="phone" 
                   value={formData.phone} 
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                  className={`w-full px-4 py-2 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
                 />
+                {errors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                )}
               </div>
               
               <div>
@@ -151,8 +318,12 @@ const FinancesPage = () => {
                   name="propertyPrice" 
                   value={formData.propertyPrice} 
                   onChange={handleNumberChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
+                  min="1"
+                  className={`w-full px-4 py-2 border ${errors.propertyPrice ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
                 />
+                {errors.propertyPrice && (
+                  <p className="mt-1 text-sm text-red-600">{errors.propertyPrice}</p>
+                )}
               </div>
             </div>
           </div>
@@ -160,7 +331,10 @@ const FinancesPage = () => {
       case 2:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Loan Details</h2>
+            <h2 className="text-2xl font-semibold text-blue-800 flex items-center">
+              <FileText className="mr-2 h-6 w-6 text-blue-600" />
+              Loan Details
+            </h2>
             
             <div className="space-y-6">
               <div>
@@ -175,11 +349,17 @@ const FinancesPage = () => {
                     max="50"
                     value={formData.downPaymentPercent}
                     onChange={handleNumberChange}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" 
+                    className="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer" 
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${formData.downPaymentPercent*2}%, #e5e7eb ${formData.downPaymentPercent*2}%, #e5e7eb 100%)`
+                    }}
                   />
                   <span className="text-sm font-medium text-gray-700 min-w-[50px]">
                     {formData.downPaymentPercent}%
                   </span>
+                </div>
+                <div className="mt-1 text-sm text-gray-500">
+                  Down Payment Amount: LKR {(formData.propertyPrice * (formData.downPaymentPercent / 100)).toLocaleString()}
                 </div>
               </div>
               
@@ -211,7 +391,10 @@ const FinancesPage = () => {
                     max="20"
                     value={formData.interestRate}
                     onChange={handleNumberChange}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" 
+                    className="w-full h-2 bg-blue-100 rounded-lg appearance-none cursor-pointer" 
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(formData.interestRate-8)*8.33}%, #e5e7eb ${(formData.interestRate-8)*8.33}%, #e5e7eb 100%)`
+                    }}
                   />
                   <span className="text-sm font-medium text-gray-700 min-w-[50px]">
                     {formData.interestRate}%
@@ -254,11 +437,14 @@ const FinancesPage = () => {
       case 3:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Bank Selection</h2>
+            <h2 className="text-2xl font-semibold text-blue-800 flex items-center">
+              <Building className="mr-2 h-6 w-6 text-blue-600" />
+              Bank Selection
+            </h2>
             
             <div className="space-y-4">
               {banks.map(bank => (
-                <div key={bank.id} className="flex items-start p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+                <div key={bank.id} className={`flex items-start p-4 border ${formData.bank === bank.name ? 'border-blue-500 bg-blue-50' : 'border-gray-200'} rounded-lg hover:bg-blue-50 transition-colors duration-200`}>
                   <input 
                     type="radio" 
                     id={bank.id}
@@ -268,7 +454,7 @@ const FinancesPage = () => {
                     onChange={handleChange}
                     className="mt-1 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" 
                   />
-                  <label htmlFor={bank.id} className="ml-3 cursor-pointer block">
+                  <label htmlFor={bank.id} className="ml-3 cursor-pointer block w-full">
                     <span className="block text-sm font-medium text-gray-900">{bank.name}</span>
                     <span className="block text-sm text-gray-500">{bank.info}</span>
                   </label>
@@ -280,59 +466,57 @@ const FinancesPage = () => {
       case 4:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Additional Costs</h2>
+            <h2 className="text-2xl font-semibold text-blue-800 flex items-center">
+              <DollarSign className="mr-2 h-6 w-6 text-blue-600" />
+              Additional Costs
+            </h2>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Property Taxes (LKR)
-                </label>
-                <input 
-                  type="number" 
-                  name="propertyTaxes" 
-                  value={formData.propertyTaxes} 
-                  onChange={handleNumberChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
-                />
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <h3 className="font-medium text-gray-800 mb-4">Standard Processing Fees</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-gray-700">Property Taxes</span>
+                    <span className="font-medium">LKR {additionalCosts.propertyTaxes.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-gray-700">Home Insurance</span>
+                    <span className="font-medium">LKR {additionalCosts.homeInsurance.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-gray-700">Valuation Fees</span>
+                    <span className="font-medium">LKR {additionalCosts.valuationFees.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-700">Legal Fees</span>
+                    <span className="font-medium">LKR {additionalCosts.legalFees.toLocaleString()}</span>
+                  </div>
+                </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Home Insurance (LKR)
-                </label>
-                <input 
-                  type="number" 
-                  name="homeInsurance" 
-                  value={formData.homeInsurance} 
-                  onChange={handleNumberChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
-                />
+              <div className="flex justify-between items-center p-4 bg-blue-50 rounded-lg">
+                <span className="font-medium text-blue-800">Total Additional Costs</span>
+                <span className="font-bold text-blue-800">
+                  LKR {(additionalCosts.propertyTaxes + additionalCosts.homeInsurance + 
+                  additionalCosts.valuationFees + additionalCosts.legalFees).toLocaleString()}
+                </span>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Valuation Fees (LKR)
-                </label>
-                <input 
-                  type="number" 
-                  name="valuationFees" 
-                  value={formData.valuationFees} 
-                  onChange={handleNumberChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Legal Fees (LKR)
-                </label>
-                <input 
-                  type="number" 
-                  name="legalFees" 
-                  value={formData.legalFees} 
-                  onChange={handleNumberChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" 
-                />
+              <div className="p-4 border-l-4 border-yellow-400 bg-yellow-50 rounded-r-lg">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">
+                      These are standard processing fees that apply to most property finance applications.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -350,64 +534,126 @@ const FinancesPage = () => {
           
           return (
             <div className="space-y-6">
-              <h2 className="text-2xl font-semibold text-gray-800">Review and Submit</h2>
+              <h2 className="text-2xl font-semibold text-blue-800 flex items-center">
+                <Clipboard className="mr-2 h-6 w-6 text-blue-600" />
+                Review and Submit
+              </h2>
               
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900">Loan Summary</h3>
+              <div className="bg-white rounded-lg border border-blue-200 overflow-hidden shadow">
+                <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+                  <h3 className="text-lg font-medium text-blue-800">Loan Summary</h3>
                 </div>
                 
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Property Price:</span>
-                      <span className="text-sm font-medium">LKR {formData.propertyPrice.toLocaleString()}</span>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Personal Details</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Name:</span>
+                            <span className="text-sm font-medium">{formData.fullName}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Email:</span>
+                            <span className="text-sm font-medium">{formData.email}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Phone:</span>
+                            <span className="text-sm font-medium">{formData.phone}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Selected Bank:</span>
+                            <span className="text-sm font-medium">{formData.bank}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Property and Loan Details</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Property Price:</span>
+                            <span className="text-sm font-medium">LKR {formData.propertyPrice.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Down Payment:</span>
+                            <span className="text-sm font-medium">LKR {downPaymentAmount.toLocaleString()} ({formData.downPaymentPercent}%)</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Loan Amount:</span>
+                            <span className="text-sm font-medium">LKR {loanAmount.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Loan Term:</span>
+                            <span className="text-sm font-medium">{formData.loanTerm} years</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Interest Rate:</span>
+                            <span className="text-sm font-medium">{formData.interestRate}%</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Down Payment:</span>
-                      <span className="text-sm font-medium">LKR {downPaymentAmount.toFixed(2)} ({formData.downPaymentPercent}%)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Loan Amount:</span>
-                      <span className="text-sm font-medium">LKR {loanAmount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Loan Term:</span>
-                      <span className="text-sm font-medium">{formData.loanTerm} years</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Interest Rate:</span>
-                      <span className="text-sm font-medium">{formData.interestRate}%</span>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Payment Details</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Loan Type:</span>
+                            <span className="text-sm font-medium capitalize">{formData.loanType}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Payment Frequency:</span>
+                            <span className="text-sm font-medium capitalize">{formData.paymentFrequency}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Monthly Payment:</span>
+                            <span className="text-sm font-medium">LKR {monthlyPayment.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Total Interest:</span>
+                            <span className="text-sm font-medium">LKR {totalInterest.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Additional Costs</h4>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Property Taxes:</span>
+                            <span className="text-sm font-medium">LKR {formData.propertyTaxes.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Home Insurance:</span>
+                            <span className="text-sm font-medium">LKR {formData.homeInsurance.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Valuation & Legal:</span>
+                            <span className="text-sm font-medium">LKR {(formData.valuationFees + formData.legalFees).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between font-medium text-blue-800">
+                            <span>Total Additional Costs:</span>
+                            <span>LKR {totalAdditionalCosts.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Loan Type:</span>
-                      <span className="text-sm font-medium capitalize">{formData.loanType}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Payment Frequency:</span>
-                      <span className="text-sm font-medium capitalize">{formData.paymentFrequency}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Monthly Payment:</span>
-                      <span className="text-sm font-medium">LKR {monthlyPayment.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Total Interest:</span>
-                      <span className="text-sm font-medium">LKR {totalInterest.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-500">Total Cost:</span>
-                      <span className="text-sm font-medium">LKR {totalCost.toFixed(2)}</span>
+                  <div className="mt-6 pt-6 border-t border-blue-100">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-blue-800">Total Cost of Financing:</span>
+                      <span className="text-lg font-bold text-blue-800">LKR {totalCost.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                  <p className="text-sm text-gray-500">
-                    By submitting this application, you agree to our terms and conditions.
+                <div className="px-6 py-4 bg-blue-50 border-t border-blue-200">
+                  <p className="text-sm text-gray-700">
+                    By submitting this application, you agree to our terms and conditions. Your application will be reviewed by our finance team and the selected bank.
                   </p>
                 </div>
               </div>
@@ -420,40 +666,59 @@ const FinancesPage = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Finance Application</h1>
-      
-      {/* Progress Bar */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {steps.map((stepItem, index) => (
-            <div key={stepItem.id} className="relative flex flex-col items-center">
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                step > stepItem.id ? 'bg-blue-600 border-blue-600' : 
-                step === stepItem.id ? 'border-blue-600 text-blue-600' : 
-                'border-gray-300 text-gray-300'
-              }`}>
-                {step > stepItem.id ? (
-                  <Check className="h-6 w-6 text-white" />
-                ) : (
-                  <span className="text-sm font-medium">{stepItem.id}</span>
-                )}
-              </div>
-              <div className="mt-2 text-xs text-center">{stepItem.name}</div>
-              
-              {/* Connector line */}
-              {index < steps.length - 1 && (
-                <div className={`absolute top-5 left-10 w-full h-[2px] ${
-                  step > stepItem.id ? 'bg-blue-600' : 'bg-gray-300'
-                }`}></div>
-              )}
-            </div>
-          ))}
+    <div 
+  className="w-full h-screen bg-no-repeat bg-cover bg-center"
+  style={{ 
+    backgroundImage: `url(${backgroundImage})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    minHeight: '100vh',
+    width: '100%',
+    margin: 0,
+    padding: 0,
+    overflow: 'hidden'
+  }}
+>
+     <div className="max-w-4xl mx-auto p-6  bg-white rounded-lg shadow-lg">
+      <h1 className="text-3xl font-bold text-blue-800 mb-6">Finance Application</h1>
+     <div className="mb-8 w-full max-w-4xl mx-auto">
+    <div className="relative flex items-center justify-between">
+    {/* Connection Lines */}
+    <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
+    <div 
+      className="absolute top-1/2 left-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600 -translate-y-1/2 z-0 transition-all duration-500"
+      style={{ width: `${(100 * (step - 1)) / (steps.length - 1)}%` }}
+    ></div>
+    
+    {/* Step Indicators */}
+    {steps.map((stepItem, index) => (
+      <div key={stepItem.id} className="relative flex flex-col items-center z-10">
+        <div 
+          className={`flex items-center justify-center w-12 h-12 rounded-full border-2 font-medium transition-all duration-300 ${
+            step > stepItem.id
+              ? "bg-gradient-to-r from-blue-500 to-indigo-600 border-blue-600 text-white"
+              : step === stepItem.id
+              ? "bg-white border-blue-500 text-blue-600 ring-4 ring-blue-100"
+              : "bg-white border-gray-300 text-gray-400"
+          }`}
+        >
+          <span>{stepItem.icon}</span>
+        </div>
+        
+        <div className={`mt-2 text-sm font-medium whitespace-nowrap ${
+          step >= stepItem.id ? "text-blue-600" : "text-gray-500"
+        }`}>
+          {stepItem.name}
         </div>
       </div>
+    ))}
+  </div>
+</div>
+
       
       {/* Form Section */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
+      <div className="bg-white p-6 rounded-lg border border-blue-200 mb-6 shadow">
         {renderStep()}
       </div>
       
@@ -463,7 +728,7 @@ const FinancesPage = () => {
           <button 
             type="button" 
             onClick={prevStep}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Previous
@@ -474,7 +739,7 @@ const FinancesPage = () => {
           <button 
             type="button" 
             onClick={nextStep}
-            className="ml-auto inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="ml-auto inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
           >
             Next
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -483,14 +748,48 @@ const FinancesPage = () => {
           <button 
             type="button" 
             onClick={handleSubmit}
-            className="ml-auto inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            className="ml-auto inline-flex items-center px-5 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200"
           >
             Submit Application
+            <Check className="ml-2 h-4 w-4" />
           </button>
         )}
       </div>
+      {/* Success Modal */}
+{showSuccessModal && (
+  <div className="fixed inset-0 fill-white bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+      <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+        <Check className="h-6 w-6 text-green-600" />
+      </div>
+      <div className="mt-3 text-center">
+        <h3 className="text-lg font-medium to-blue-800 ">Application Submitted!</h3>
+        <div className="mt-2">
+          <p className="text-sm text-gray-500">
+            Your finance application has been successfully submitted. An email has been sent to your selected bank ({formData.bank}).
+          </p>
+        </div>
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => {
+              setShowSuccessModal(false);
+              resetForm();
+            }}
+            className="inline-flex justify-center w-full rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:text-sm"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
+  </div>
+)}
+</div>
+</div>
   );
 };
 
 export default FinancesPage;
+
+

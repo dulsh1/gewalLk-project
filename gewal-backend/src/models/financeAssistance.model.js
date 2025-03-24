@@ -12,6 +12,11 @@ const financeSchema = new Schema({
     ref: 'User',
     required: false  // Make it optional
   },
+  status: {
+    type: String,
+    enum: ['pending', 'approved'],
+    default: 'pending'
+  },
   loanAmount: {
     type: Number,
     required: true,
@@ -85,19 +90,19 @@ financeSchema.virtual('downPaymentPercentage').get(function() {
 financeSchema.pre('save', function(next) {
   const monthlyRate = this.interestRate / 100 / 12;
   const payments = this.loanTerm * 12;
-
+  
   this.monthlyPayment = (
     (monthlyRate * this.loanAmount) /
     (1 - Math.pow(1 + monthlyRate, -payments))
   );
-
+  
   const totalInterest = (this.monthlyPayment * payments) - this.loanAmount;
   const totalAdditionalCosts = (this.propertyTaxes + this.homeInsurance + this.valuationFees + this.legalFees);
-
+  
   this.totalInterest = totalInterest;
   this.totalCost = this.loanAmount + totalInterest + totalAdditionalCosts;
   this.amortizationSchedule = this.generateAmortizationSchedule();
-
+  
   next();
 });
 
@@ -106,21 +111,21 @@ financeSchema.methods.generateAmortizationSchedule = function() {
   let balance = this.loanAmount;
   const monthlyPayment = this.monthlyPayment;
   const monthlyRate = this.interestRate / 100 / 12;
-
+  
   for (let month = 1; month <= this.loanTerm * 12; month++) {
     const interest = balance * monthlyRate;
     const principal = monthlyPayment - interest;
-
+    
     schedule.push({
       date: new Date(new Date().setMonth(new Date().getMonth() + month)),
       principal: Number(principal.toFixed(2)),
       interest: Number(interest.toFixed(2)),
       remainingBalance: Number((balance - principal).toFixed(2))
     });
-
+    
     balance -= principal;
   }
-
+  
   return schedule;
 };
 

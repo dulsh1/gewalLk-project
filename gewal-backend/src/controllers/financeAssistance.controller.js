@@ -135,3 +135,27 @@ exports.deleteFinance = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Approve a finance application
+// @route   PUT /api/finance/:id/approve
+// @access  Public (you may want to make this Admin only in your authorization middleware)
+exports.approveFinance = async (req, res) => {
+  try {
+    const finance = await Finance.findById(req.params.id);
+
+    if (!finance) {
+      return res.status(404).json({ message: 'Finance application not found' });
+    }
+
+    // Update status to approved
+    finance.status = 'approved';
+
+    const approvedFinance = await finance.save();
+    res.status(200).json({
+      message: 'Finance application approved successfully',
+      finance: approvedFinance
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

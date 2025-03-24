@@ -5,7 +5,8 @@ const {
   getAllFinance,
   getFinanceById,
   updateFinance,
-  deleteFinance
+  deleteFinance,
+  approveFinance
 } = require('../controllers/financeAssistance.controller');
 
 // @route   POST /api/finance
@@ -32,5 +33,7 @@ router.put('/:id', updateFinance);
 // @desc    Delete a finance application
 // @access  Public
 router.delete('/:id', deleteFinance);
+
+router.put('/:id/approve', approveFinance )
 
 module.exports = router;

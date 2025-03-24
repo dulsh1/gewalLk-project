@@ -24,6 +24,7 @@ import AdminOverview from './components/admin/dashboard/AdminOverview';
 
 // Protected routes
 import { UserProtectedRoute, AdminProtectedRoute } from './components/common/ProtectedRoutes';
+import AdminFinancePage from './pages/Adminfinances';
 
 function App() {
   return (
@@ -33,7 +34,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/finances" element={<FinancesPage />} /> {/* New FinancesPage route */}
-          
+          <Route path="/finances/admin" element={<AdminFinancePage />} /> 
           {/* User Auth Routes */}
           <Route path="/login" element={<UserLogin />} />
           <Route path="/register" element={<UserRegister />} />
