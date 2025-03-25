@@ -666,24 +666,11 @@ const FinancesPage = () => {
   };
 
   return (
-    <div 
-  className="w-full h-screen bg-no-repeat bg-cover bg-center"
-  style={{ 
-    backgroundImage: `url(${backgroundImage})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    minHeight: '100vh',
-    width: '100%',
-    margin: 0,
-    padding: 0,
-    overflow: 'hidden'
-  }}
->
-     <div className="max-w-4xl mx-auto p-6  bg-white rounded-lg shadow-lg">
+    <div style={{ backgroundImage: `url(${backgroundImage})` }} >
+    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
       <h1 className="text-3xl font-bold text-blue-800 mb-6">Finance Application</h1>
      <div className="mb-8 w-full max-w-4xl mx-auto">
-    <div className="relative flex items-center justify-between">
+  <div className="relative flex items-center justify-between">
     {/* Connection Lines */}
     <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2 z-0"></div>
     <div 
